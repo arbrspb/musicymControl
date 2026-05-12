@@ -1,0 +1,31 @@
+# Node modules
+node_modules/
+server/node_modules/
+
+# Logs
+*.log
+server/server.log
+
+# VSCode
+.vscode/
+
+# macOS
+.DS_Store
+
+# Extension build / output
+extension.crx
+extension.pem
+
+# Optional: OS files
+Thumbs.db
+
+# Archives and executables
+*.zip
+*.exe
+
+# Other
+dist/
+
+#Local env files
+.env
+server/.env

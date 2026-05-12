@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>MusicYM Control</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font: 14px/1.5 system-ui, sans-serif;
+      color: #111827;
+      background: #f9fafb;
+    }
+
+    h1 {
+      margin-top: 0;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button, input[type="range"] {
+      min-height: 40px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    button {
+      padding: 0 12px;
+      border: 0;
+      border-radius: 10px;
+      cursor: pointer;
+      background: #111827;
+      color: #fff;
+    }
+
+    button.is-liked {
+      color: #9ca3af;
+    }
+
+    button.is-disliked {
+      color: #9ca3af;
+    }
+
+    .time-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 8px;
+      color: #6b7280;
+      font-variant-numeric: tabular-nums;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 12px;
+      border-radius: 12px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>MusicYM Control</h1>
+
+  <section class="card">
+    <div id="summary">Загрузка…</div>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <button id="prevBtn">⏮ Prev</button>
+      <button id="toggleBtn">⏯ Play/Pause</button>
+      <button id="nextBtn">⏭ Next</button>
+      <button id="likeBtn" aria-pressed="false">&#9825; Like</button>
+      <button id="dislikeBtn">🚫 Dislike</button>
+      <button id="refreshBtn">↻ Refresh</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <label for="positionRange">Позиция</label>
+    <div class="time-row">
+      <span id="positionCurrent">0:00</span>
+      <span id="positionDuration">0:00</span>
+    </div>
+    <input id="positionRange" type="range" min="0" max="0" step="0.1" value="0" disabled />
+  </section>
+
+  <section class="card">
+    <label for="volumeRange">Громкость</label>
+    <input id="volumeRange" type="range" min="0" max="100" value="50" />
+  </section>
+
+  <section class="card">
+    <strong>Последнее состояние:</strong>
+    <pre id="stateDump">{}</pre>
+  </section>
+
+  <script src="control.js"></script>
+</body>
+</html>
