@@ -198,7 +198,7 @@ async function checkPlayerTabStatus() {
 
   try {
     await chrome.tabs.sendMessage(tab.id, {
-      type: "PLAYER_REQUEST_STATE",
+      type: "PLAYER_PING",
       requestId: crypto.randomUUID()
     });
 
@@ -221,6 +221,7 @@ async function checkPlayerTabStatus() {
     };
   }
 }
+
 
 async function ensurePlayerTab({ reload = false } = {}) {
   const tab = await getFirstYandexTab();

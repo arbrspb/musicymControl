@@ -20,6 +20,17 @@ let isChangingVolume = false;
 let lastVolumeKey = "";
 let lastVolumeAt = 0;
 let volumeHoldUntil = 0;
+let refreshTimer = null;
+
+function scheduleRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer);
+
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null;
+    void refresh();
+  }, 150);
+}
+
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -218,9 +229,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     isChangingVolume = false;
   });
 
-  chrome.storage.onChanged.addListener(() => {
-    void refresh();
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local") return;
+  scheduleRefresh();
   });
+
 
   await refresh();
 });

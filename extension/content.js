@@ -46,6 +46,11 @@ window.addEventListener("message", (event) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "PLAYER_PING") {
+    sendResponse({ ok: true, accepted: true });
+    return;
+  }
+
   if (message?.type === "PLAYER_COMMAND") {
     postToPage({
       type: "PLAYER_COMMAND",
@@ -65,6 +70,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ ok: true, accepted: true });
   }
 });
+
 
 postToPage({
   type: "PLAYER_REQUEST_STATE",

@@ -19,6 +19,18 @@ const ui = {
   openControl: document.getElementById("openControl")
 };
 
+let renderTimer = null;
+
+function scheduleRender() {
+  if (renderTimer) clearTimeout(renderTimer);
+
+  renderTimer = setTimeout(() => {
+    renderTimer = null;
+    void render();
+  }, 150);
+}
+
+
 function normalizeOrigin(origin) {
   return String(origin || defaultServerOrigin).trim().replace(/\/+$/, "");
 }
@@ -210,9 +222,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  chrome.storage.onChanged.addListener(() => {
-    void render();
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local") return;
+  scheduleRender();
   });
+
 
   await render();
 });
