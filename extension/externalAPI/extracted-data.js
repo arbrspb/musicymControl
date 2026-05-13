@@ -3,11 +3,7 @@ import { ExecutionDelay, MethodInterceptor, customEvents } from "./utils.js";
 
 export const Controller = {};
 
-DataReady.ready(({ controller, playbackController: playback }) => {
-    Object.assign(Controller, controller);
-    Object.setPrototypeOf(Controller, Object.getPrototypeOf(controller));
-    ExtractedData.playbackController = playback.playbackController;
-}, false, ...EXPECTED_DATA);
+
 
 const NUMBER_OF_VIBE_TRACKS = 7;
 
@@ -48,6 +44,13 @@ const ExtractedData = {
         });
     }
 }
+
+DataReady.ready(({ controller, playbackController: playback }) => {
+    Object.assign(Controller, controller);
+    Object.setPrototypeOf(Controller, Object.getPrototypeOf(controller));
+    ExtractedData.playbackController = playback.playbackController;
+}, false, ...EXPECTED_DATA);
+
 
 const State = {
     playerState: {

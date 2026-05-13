@@ -112,7 +112,12 @@ export const externalApiOn = (type, listener) => {
         case externalAPI.EVENT_READY:
             if (!isApiReady) return;
             customEvents.execute(type).then(() => customEvents.off(type, listener));
+            break;   
+
+        case externalAPI.EVENT_SOURCE_INFO:
+            onChangeList.add(type);
             break;
+    
 
         case externalAPI.EVENT_CONTROLS:
             const onControls = () => { customEvents.execute(type); };
