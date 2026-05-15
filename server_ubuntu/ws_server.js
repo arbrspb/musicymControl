@@ -520,6 +520,14 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
     details.card > summary::after { content: "⌄"; float: right; opacity: .75; }
     details.card[open] > summary::after { content: "⌃"; }
     .queue-list { display: grid; gap: 8px; margin-top: 12px; }
+    .vibe-list { display: grid; gap: 8px; margin-top: 12px; }
+    .vibe-preset { width: 100%; min-height: 52px; flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #111827; color: #f9fafb; text-align: left; }
+    .vibe-preset:active { background: #2563eb; }
+    .vibe-preset.is-active { outline: 2px solid #facc15; color: #facc15; }
+    .vibe-preset.is-accent { color: #facc15; }
+    .vibe-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 700; }
+    .vibe-mark { font-size: 12px; opacity: .8; }
+
     .queue-track { width: 100%; min-height: 58px; flex: 0 0 auto; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px; border-radius: 12px; background: #111827; color: #f9fafb; text-align: left; }
     .queue-track:active { background: #2563eb; }
     .queue-cover { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #374151; }
@@ -583,6 +591,11 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
       <summary>Следующие треки <span class="status" id="queueCount"></span></summary>
       <div class="queue-list" id="queueList"></div>
     </details>
+       
+    <details class="card vibe-card">
+      <summary>Моя волна <span class="status" id="vibeCurrent"></span></summary>
+      <div class="vibe-list" id="vibeList"></div>
+    </details>
 
     <details class="card">
       <summary>Pair code: <strong id="pairCode"></strong></summary>
@@ -608,6 +621,9 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
       const dislikeEl = document.getElementById("dislike");
       const queueListEl = document.getElementById("queueList");
       const queueCountEl = document.getElementById("queueCount");
+      const vibeListEl = document.getElementById("vibeList");
+      const vibeCurrentEl = document.getElementById("vibeCurrent");
+
 
       let socket = null;
       let isSeeking = false;
@@ -684,6 +700,54 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
         if (!Array.isArray(track?.artists)) return "—";
         return track.artists.join(", ") || "—";
       }
+
+      function renderVibe(vibe) {
+        const presets = Array.isArray(vibe?.presets) ? vibe.presets : [];
+        const selectedId = vibe?.currentId || "";
+
+        vibeListEl.textContent = "";
+        vibeCurrentEl.textContent = vibe?.title ? "— " + vibe.title : "";
+
+        if (presets.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = "Варианты пока не загружены";
+          vibeListEl.appendChild(empty);
+          return;
+        }
+
+        for (const preset of presets) {
+          const item = document.createElement("button");
+          item.type = "button";
+          item.className = "vibe-preset";
+
+          const isActive =
+            preset.id === selectedId &&
+            preset.style !== "CONTROL_ACCENT";
+          const isAccent = preset.style === "CONTROL_ACCENT";
+
+          item.classList.toggle("is-active", isActive);
+          item.classList.toggle("is-accent", isAccent);
+
+          const title = document.createElement("div");
+          title.className = "vibe-title";
+          title.textContent = preset.title || "Без названия";
+
+          const mark = document.createElement("div");
+          mark.className = "vibe-mark";
+          mark.textContent = isActive ? "Выбрано" : "";
+
+          item.appendChild(title);
+          item.appendChild(mark);
+
+          item.addEventListener("click", () => {
+            sendCommand("selectVibePreset", { id: preset.id });
+          });
+
+          vibeListEl.appendChild(item);
+        }
+      }
+
 
       function renderQueue(tracks) {
         const list = Array.isArray(tracks) ? tracks : [];
@@ -879,6 +943,7 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
 
         applyReactions(track);
         applyProgress(state?.progress);
+        renderVibe(state?.vibe);
         renderQueue(state?.upcomingTracks);
         setDebug(state || { info: "Состояние ещё не получено" });
       }
@@ -1042,6 +1107,7 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
       });
 
       pairCodeEl.textContent = bootstrap.pairCode || "—";
+      renderVibe(null);
       renderQueue([]);
       setDebug({ pairCode: bootstrap.pairCode, sessionId: bootstrap.sessionId });
       connect();

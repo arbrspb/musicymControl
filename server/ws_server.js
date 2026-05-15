@@ -703,7 +703,7 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
 
       function renderVibe(vibe) {
         const presets = Array.isArray(vibe?.presets) ? vibe.presets : [];
-        const activeId = vibe?.activeId || vibe?.currentId || "";
+        const selectedId = vibe?.currentId || "";
 
         vibeListEl.textContent = "";
         vibeCurrentEl.textContent = vibe?.title ? "— " + vibe.title : "";
@@ -721,7 +721,9 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
           item.type = "button";
           item.className = "vibe-preset";
 
-          const isActive = preset.id === activeId;
+          const isActive =
+            preset.id === selectedId &&
+            preset.style !== "CONTROL_ACCENT";
           const isAccent = preset.style === "CONTROL_ACCENT";
 
           item.classList.toggle("is-active", isActive);
