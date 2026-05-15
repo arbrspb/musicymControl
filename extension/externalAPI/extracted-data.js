@@ -419,18 +419,45 @@ const Vibe = {
         };
     },
 
-    selectPreset(id) {
+    async selectPreset(id) {
         const items = this.wheel?.items;
         if (!items) throw new Error("Vibe wheel is not loaded");
 
         const item = Array.from(items).find((preset) => preset.id === id);
+        if (!item) throw new Error(`Vibe preset not found: ${id}`);
 
-        if (!item || typeof item.handleFeedbackClick !== "function") {
-            throw new Error(`Vibe preset not found: ${id}`);
+        const rawSeeds = item.data?.seeds ? Array.from(item.data.seeds) : [];
+        if (rawSeeds.length === 0) {
+            throw new Error(`Vibe preset has no seeds: ${id}`);
         }
 
-        return item.handleFeedbackClick();
+        const current = State.currentContext?.contextData;
+        const isReshuffle = item.id === "diversity:reshuffle";
+        const reshuffleSeed = `diversity:reshuffle_${Date.now()}`;
+
+        const seeds = isReshuffle ? [reshuffleSeed] : rawSeeds;
+        const metaId = isReshuffle ? reshuffleSeed : item.id;
+
+        const context = await Controller.contextController.factory.createContext({
+            data: {
+                type: "vibe",
+                meta: { id: metaId },
+                seeds,
+                from: current?.from || "web-wave_landing_screen-radio-wheel-default",
+                includeTracksInResponse: true,
+                interactive: true,
+                parentContextId: current?.parentContextId
+            }
+        });
+
+        return Controller.playContext({
+            context,
+            queueParams: { index: 0 },
+            entitiesData: undefined,
+            loadContextMeta: undefined
+        });
     }
+
 };
 
 
