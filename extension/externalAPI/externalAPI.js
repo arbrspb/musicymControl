@@ -1,6 +1,6 @@
 import { DataReady, EXPECTED_DATA, externalAPI } from "./controller.js";
 import { initEvents, checkLikeDislike, externalApiOn, externalApiOff, } from "./api-utils.js";
-import { State, Toggles, Tracks } from "./extracted-data.js";
+import { State, Toggles, Tracks, Vibe } from "./extracted-data.js";
 
 if (!window.externalAPI) { window.externalAPI = externalAPI; }
 
@@ -97,6 +97,8 @@ function generateApi () {
     externalAPI.getSpeed = State.getSpeed;
     externalAPI.getTrackIndex = () => { return State.index; }
     externalAPI.getTracksList = () => { return Tracks.converted; }
+    externalAPI.getVibeInfo = () => { return Vibe.info; }
+
 
     externalAPI.getVolume = State.getVolume
     externalAPI.isPlaying = State.isPlaying;
@@ -108,6 +110,8 @@ function generateApi () {
     externalAPI.setSpeed = Toggles.setSpeed;
     externalAPI.setVolume = Toggles.setVolume;
     externalAPI.populate = Tracks.populate;
+    externalAPI.selectVibePreset = Vibe.selectPreset.bind(Vibe);
+
 
     externalAPI.toggleDislike = Toggles.toggleTrackDisike;
     externalAPI.toggleLike = Toggles.toggleTrackLike;

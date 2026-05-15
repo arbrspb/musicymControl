@@ -56,6 +56,34 @@
     };
   }
 
+    function compactVibePreset(preset) {
+    if (!preset || typeof preset !== "object") return null;
+
+    return {
+      id: preset.id || "",
+      index: Number(preset.index) || 0,
+      type: preset.type || "",
+      style: preset.style || "",
+      title: preset.title || "",
+      description: preset.description || ""
+    };
+  }
+
+  function getVibeInfo(api) {
+    const info = safe(() => api.getVibeInfo(), null);
+    if (!info || typeof info !== "object") return null;
+
+    return {
+      isVibe: Boolean(info.isVibe),
+      title: info.title || "",
+      currentId: info.currentId || null,
+      activeId: info.activeId || null,
+      presets: Array.isArray(info.presets)
+        ? info.presets.map(compactVibePreset).filter(Boolean)
+        : []
+    };
+  }
+
   function getUpcomingTracks(api, currentIndex, limit = 8) {
     const tracksList = safe(() => api.getTracksList(), []);
     if (!Array.isArray(tracksList) || currentIndex < 0) return [];
@@ -152,7 +180,9 @@
       speed: safe(() => api.getSpeed()),
       shuffle: safe(() => api.getShuffle()),
       repeat: safe(() => api.getRepeat()),
-      isPlaying: safe(() => api.isPlaying())
+      isPlaying: safe(() => api.isPlaying()),
+      vibe: safe(() => getVibeInfo(api), null)
+
     };
   }
 
@@ -226,6 +256,9 @@
         const index = Number(payload.index);
         return runNavigation(api, "playIndex", () => api.play(index));
       }
+
+      case "selectVibePreset":
+        return api.selectVibePreset(String(payload.id || ""));
 
       case "toggleShuffle":
         return api.toggleShuffle(payload.state);

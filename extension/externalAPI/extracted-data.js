@@ -26,6 +26,13 @@ const ExtractedData = {
     get likeStore() {
         return Controller.contextController.factory.entityFactory.likeStore;
     },
+    get rootStore() {
+    if (!this.likeStore) return null;
+    return this.likeStore.$treenode.root.storedValue;
+    },
+    get wheelStore() {
+        return this.rootStore?.wheel || null;
+    },
     get queueController() {
         if (!Controller.queueController) return null;
         return Controller.queueController;
@@ -354,6 +361,79 @@ const Tracks = {
     }
 }
 
+const Vibe = {
+    get wheel() {
+        return ExtractedData.wheelStore;
+    },
+
+    get currentId() {
+        return State.currentContext?.contextData?.meta?.id || null;
+    },
+
+    get activeId() {
+        const wheel = this.wheel;
+        if (!wheel) return null;
+
+        const activeItem = wheel.items?.[wheel.activeIndex];
+        return activeItem?.id || null;
+    },
+
+    compactItem(item) {
+        try {
+            const data = item?.data;
+            const title = data?.title || "";
+            const seeds = data?.seeds ? Array.from(data.seeds) : [];
+
+            if (!item?.id || !title) return null;
+
+            return {
+                id: item.id,
+                index: Number(item.index) || 0,
+                type: item.type || "",
+                style: item.style || "",
+                title,
+                description: data?.description || item.description || "",
+                seeds
+            };
+        } catch {
+            return null;
+        }
+    },
+
+    get presets() {
+        const items = this.wheel?.items;
+        if (!items) return [];
+
+        return Array.from(items)
+            .map((item) => this.compactItem(item))
+            .filter(Boolean);
+    },
+
+    get info() {
+        return {
+            isVibe: Boolean(State.isVibe),
+            title: State.vibeTitle || "",
+            currentId: this.currentId,
+            activeId: this.activeId,
+            presets: this.presets
+        };
+    },
+
+    selectPreset(id) {
+        const items = this.wheel?.items;
+        if (!items) throw new Error("Vibe wheel is not loaded");
+
+        const item = Array.from(items).find((preset) => preset.id === id);
+
+        if (!item || typeof item.handleFeedbackClick !== "function") {
+            throw new Error(`Vibe preset not found: ${id}`);
+        }
+
+        return item.handleFeedbackClick();
+    }
+};
+
+
 const Toggles = {
     /** @returns {Promise} */
     async next() {
@@ -535,10 +615,10 @@ const {
 Object.setPrototypeOf(externalAPI, Object.defineProperties({}, {
     dev: {
         value: {
-            Controller, ExtractedData, DataReady, State, Tracks, Toggles,
+                        Controller, ExtractedData, DataReady, State, Tracks, Toggles, Vibe,
             Events: customEvents
         }
     }
 }));
 
-export { State, Tracks, Toggles }
+export { State, Tracks, Toggles, Vibe }
