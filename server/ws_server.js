@@ -626,6 +626,8 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
 
 
       let socket = null;
+      let reconnectTimer = null;
+      let requestStateAfterConnect = false;
       let isSeeking = false;
       let lastSeekKey = "";
       let lastSeekAt = 0;
@@ -826,6 +828,56 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
           payload
         });
       }
+      
+      function isSocketOpen() {
+        return socket && socket.readyState === WebSocket.OPEN;
+      }
+
+      function isSocketConnecting() {
+        return socket && socket.readyState === WebSocket.CONNECTING;
+      }
+
+      function scheduleReconnect(delayMs = 2000) {
+        if (reconnectTimer) return;
+
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          connect();
+        }, delayMs);
+      }
+
+      function reconnectNow({ requestState = false } = {}) {
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+
+        if (isSocketOpen()) {
+          if (requestState) {
+            sendCommand("requestState");
+          }
+          return;
+        }
+
+        if (requestState) {
+          requestStateAfterConnect = true;
+        }
+
+        if (isSocketConnecting()) {
+          return;
+        }
+
+        connect();
+      }
+
+      function refreshFromPhone() {
+        if (!isSocketOpen()) {
+          setStatus("переподключение по кнопке");
+        }
+
+        reconnectNow({ requestState: true });
+      }
+            
 
       function applyProgress(progress) {
         const duration = Number(progress?.duration) || 0;
@@ -949,6 +1001,8 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
       }
 
       function connect() {
+        if (isSocketOpen() || isSocketConnecting()) return;
+
         setStatus("подключение к серверу");
         socket = new WebSocket(bootstrap.wsOrigin + "/ws");
 
@@ -971,8 +1025,13 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
               setStatus("WS подключён");
               pairCodeEl.textContent = message.session?.pairCode || bootstrap.pairCode || "—";
               if (message.lastState) applyState(message.lastState);
-              break;
 
+              if (requestStateAfterConnect) {
+                requestStateAfterConnect = false;
+                sendCommand("requestState");
+              }
+
+              break;
             case "auth/paired":
               setStatus("сопряжение выполнено");
               pairCodeEl.textContent = message.pairCode || bootstrap.pairCode || "—";
@@ -1010,13 +1069,28 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
 
         socket.addEventListener("close", () => {
           setStatus("соединение закрыто, переподключение через 2с");
-          setTimeout(connect, 2000);
+          scheduleReconnect();
         });
 
         socket.addEventListener("error", () => {
           setStatus("ошибка сокета");
         });
       }
+      
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          reconnectNow({ requestState: true });
+        }
+      });
+
+      window.addEventListener("pageshow", () => {
+        reconnectNow({ requestState: true });
+      });
+
+      window.addEventListener("online", () => {
+        reconnectNow({ requestState: true });
+      });
+
 
       document.getElementById("prev").addEventListener("click", () => sendCommand("prev"));
       toggleEl.addEventListener("click", () => sendCommand("playPause"));
@@ -1036,7 +1110,7 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
         setLikeState(false);
         sendCommand("dislike");
       });
-      document.getElementById("refresh").addEventListener("click", () => sendCommand("requestState"));
+      document.getElementById("refresh").addEventListener("click", () => refreshFromPhone());
 
       volumeEl.addEventListener("pointerdown", (event) => {
         if (!isPointerOnRangeThumb(volumeEl, event)) {
