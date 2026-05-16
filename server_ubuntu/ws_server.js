@@ -4,7 +4,11 @@ const crypto = require("node:crypto");
 const fs = require("fs");
 const path = require("path");
 const { WebSocketServer, WebSocket } = require("ws");
-const { createPairCode, buildRemoteUrl, createQrDataUrl } = require("./qr_utils");
+const {
+  createPairCode,
+  buildRemoteUrl,
+  createQrDataUrl,
+} = require("./qr_utils");
 const { execFileSync } = require("node:child_process");
 const LAN_ADDRESS = getLanAddress();
 
@@ -15,12 +19,11 @@ const CONFIG = {
   HEARTBEAT_MS: Number(process.env.HEARTBEAT_MS || 20 * 1000),
   PUBLIC_HTTP_ORIGIN: process.env.PUBLIC_HTTP_ORIGIN || "",
   DEBUG: process.env.DEBUG === "1" || process.env.DEBUG === "true",
-  DEBUG_CONSOLE: process.env.DEBUG_CONSOLE === "1" || process.env.DEBUG_CONSOLE === "true"
+  DEBUG_CONSOLE:
+    process.env.DEBUG_CONSOLE === "1" || process.env.DEBUG_CONSOLE === "true",
 };
 
-
 const sessions = new Map();
-
 
 const appDir = process.pkg ? path.dirname(process.execPath) : __dirname;
 const logFile = path.join(appDir, "server.log");
@@ -42,7 +45,6 @@ function log(message) {
   }
 }
 
-
 function normalizeOrigin(origin) {
   return String(origin || "").replace(/\/+$/, "");
 }
@@ -52,7 +54,8 @@ function getLanAddress() {
   if (windowsAddress) return windowsAddress;
 
   const networks = os.networkInterfaces();
-  const vpnLike = /(vpn|tap|tun|wireguard|tailscale|zerotier|openvpn|wintun|hyper-v|virtual|vmware|vbox)/i;
+  const vpnLike =
+    /(vpn|tap|tun|wireguard|tailscale|zerotier|openvpn|wintun|hyper-v|virtual|vmware|vbox)/i;
   const candidates = [];
 
   for (const [name, entries] of Object.entries(networks)) {
@@ -96,7 +99,7 @@ function getWindowsPhysicalLanAddress() {
     const address = execFileSync(
       "powershell.exe",
       ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
-      { encoding: "utf8", windowsHide: true, timeout: 2000 }
+      { encoding: "utf8", windowsHide: true, timeout: 2000 },
     ).trim();
 
     return address || null;
@@ -104,7 +107,6 @@ function getWindowsPhysicalLanAddress() {
     return null;
   }
 }
-
 
 function httpToWsOrigin(httpOrigin) {
   const url = new URL(httpOrigin);
@@ -115,13 +117,13 @@ function httpToWsOrigin(httpOrigin) {
 function getServerOrigins() {
   const localHttpOrigin = `http://127.0.0.1:${CONFIG.PORT}`;
   const publicHttpOrigin = normalizeOrigin(
-    CONFIG.PUBLIC_HTTP_ORIGIN || `http://${LAN_ADDRESS}:${CONFIG.PORT}`
+    CONFIG.PUBLIC_HTTP_ORIGIN || `http://${LAN_ADDRESS}:${CONFIG.PORT}`,
   );
 
   return {
     localHttpOrigin,
     publicHttpOrigin,
-    publicWsOrigin: httpToWsOrigin(publicHttpOrigin)
+    publicWsOrigin: httpToWsOrigin(publicHttpOrigin),
   };
 }
 
@@ -133,7 +135,9 @@ function applyCors(res) {
 
 function sendJson(res, statusCode, payload) {
   applyCors(res);
-  res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
+  res.writeHead(statusCode, {
+    "Content-Type": "application/json; charset=utf-8",
+  });
   res.end(JSON.stringify(payload, null, 2));
 }
 
@@ -188,11 +192,13 @@ function createSession(meta = {}) {
     meta,
     extension: null,
     phone: null,
-    lastState: null
+    lastState: null,
   };
 
   sessions.set(session.sessionId, session);
-  log(`New session created: ${session.sessionId}, pairCode: ${session.pairCode}`);
+  log(
+    `New session created: ${session.sessionId}, pairCode: ${session.pairCode}`,
+  );
   return session;
 }
 
@@ -212,8 +218,8 @@ function publicSession(session) {
     expiresAt: new Date(session.expiresAt).toISOString(),
     connected: {
       extension: Boolean(session.extension),
-      phone: Boolean(session.phone)
-    }
+      phone: Boolean(session.phone),
+    },
   };
 }
 
@@ -262,7 +268,7 @@ function clearSocket(ws) {
     type: "peer/disconnected",
     sessionId,
     role,
-    at: new Date().toISOString()
+    at: new Date().toISOString(),
   });
 
   if (!session.extension && !session.phone && isExpired(session)) {
@@ -277,7 +283,9 @@ function socketSession(ws) {
 }
 
 function handleHello(ws, message) {
-  log(`handleHello from ${message.role}: sessionId=${message.sessionId || 'new session'}`);
+  log(
+    `handleHello from ${message.role}: sessionId=${message.sessionId || "new session"}`,
+  );
 
   if (message.role !== "extension" && message.role !== "phone") {
     sendError(ws, "INVALID_ROLE", "role must be extension or phone");
@@ -290,7 +298,11 @@ function handleHello(ws, message) {
     session = sessions.get(message.sessionId);
 
     if (!session || isExpired(session)) {
-      sendError(ws, "SESSION_NOT_FOUND", "Pairing session not found or expired");
+      sendError(
+        ws,
+        "SESSION_NOT_FOUND",
+        "Pairing session not found or expired",
+      );
       ws.close(4404, "Session not found");
       return;
     }
@@ -307,14 +319,14 @@ function handleHello(ws, message) {
       type: "hello/ack",
       role: "extension",
       session: publicSession(session),
-      lastState: session.lastState
+      lastState: session.lastState,
     });
 
     if (session.phone) {
       safeSend(ws, {
         type: "auth/paired",
         sessionId: session.sessionId,
-        pairCode: session.pairCode
+        pairCode: session.pairCode,
       });
     }
 
@@ -343,32 +355,34 @@ function handleHello(ws, message) {
     type: "hello/ack",
     role: "phone",
     session: publicSession(session),
-    lastState: session.lastState
+    lastState: session.lastState,
   });
 
   safeSend(ws, {
     type: "auth/paired",
     sessionId: session.sessionId,
-    pairCode: session.pairCode
+    pairCode: session.pairCode,
   });
 
   safeSend(session.extension, {
     type: "auth/paired",
     sessionId: session.sessionId,
-    pairCode: session.pairCode
+    pairCode: session.pairCode,
   });
 
   if (session.lastState) {
     safeSend(ws, {
       type: "state/update",
       sessionId: session.sessionId,
-      state: session.lastState
+      state: session.lastState,
     });
   }
 }
 
 function handleCommand(ws, message) {
-  log(`handleCommand from ${ws.role}: action=${message.action}, payload=${JSON.stringify(message.payload)}`);  
+  log(
+    `handleCommand from ${ws.role}: action=${message.action}, payload=${JSON.stringify(message.payload)}`,
+  );
   if (ws.role !== "phone") {
     sendError(ws, "FORBIDDEN", "Only phone clients can send commands");
     return;
@@ -376,7 +390,11 @@ function handleCommand(ws, message) {
 
   const session = socketSession(ws);
   if (!session) {
-    sendError(ws, "SESSION_NOT_FOUND", "Session is not attached to this socket");
+    sendError(
+      ws,
+      "SESSION_NOT_FOUND",
+      "Session is not attached to this socket",
+    );
     return;
   }
 
@@ -393,12 +411,14 @@ function handleCommand(ws, message) {
     requestId: message.requestId || crypto.randomUUID(),
     action: message.action,
     payload: message.payload || {},
-    sentAt: new Date().toISOString()
+    sentAt: new Date().toISOString(),
   });
 }
 
 function handleStateUpdate(ws, message) {
-  log(`handleStateUpdate from ${ws.role}: event=${message.state?.event || "unknown"}`); 
+  log(
+    `handleStateUpdate from ${ws.role}: event=${message.state?.event || "unknown"}`,
+  );
   if (ws.role !== "extension") {
     sendError(ws, "FORBIDDEN", "Only extension clients can push state");
     return;
@@ -406,7 +426,11 @@ function handleStateUpdate(ws, message) {
 
   const session = socketSession(ws);
   if (!session) {
-    sendError(ws, "SESSION_NOT_FOUND", "Session is not attached to this socket");
+    sendError(
+      ws,
+      "SESSION_NOT_FOUND",
+      "Session is not attached to this socket",
+    );
     return;
   }
 
@@ -414,26 +438,36 @@ function handleStateUpdate(ws, message) {
 
   session.lastState = {
     ...message.state,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   };
 
   safeSend(session.phone, {
     type: "state/update",
     sessionId: session.sessionId,
-    state: session.lastState
+    state: session.lastState,
   });
 }
 
 function handleCommandResult(ws, message) {
-  log(`handleCommandResult from ${ws.role}: ok=${message.ok}, requestId=${message.requestId}`);
+  log(
+    `handleCommandResult from ${ws.role}: ok=${message.ok}, requestId=${message.requestId}`,
+  );
   if (ws.role !== "extension") {
-    sendError(ws, "FORBIDDEN", "Only extension clients can push command results");
+    sendError(
+      ws,
+      "FORBIDDEN",
+      "Only extension clients can push command results",
+    );
     return;
   }
 
   const session = socketSession(ws);
   if (!session) {
-    sendError(ws, "SESSION_NOT_FOUND", "Session is not attached to this socket");
+    sendError(
+      ws,
+      "SESSION_NOT_FOUND",
+      "Session is not attached to this socket",
+    );
     return;
   }
 
@@ -446,12 +480,12 @@ function handleCommandResult(ws, message) {
     ok: Boolean(message.ok),
     result: message.result ?? null,
     error: message.error || null,
-    state: message.state || null
+    state: message.state || null,
   });
 }
 
 function handleWsMessage(ws, message) {
-  //log(`Unknown message type from ${ws.role}: ${message.type}`);  
+  //log(`Unknown message type from ${ws.role}: ${message.type}`);
   switch (message.type) {
     case "hello":
       handleHello(ws, message);
@@ -487,7 +521,7 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
   const bootstrapJson = JSON.stringify({
     wsOrigin: publicWsOrigin,
     pairCode,
-    sessionId
+    sessionId,
   });
 
   return `<!doctype html>
@@ -626,6 +660,8 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
 
 
       let socket = null;
+      let reconnectTimer = null;
+      let requestStateAfterConnect = false;
       let isSeeking = false;
       let lastSeekKey = "";
       let lastSeekAt = 0;
@@ -826,6 +862,56 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
           payload
         });
       }
+      
+      function isSocketOpen() {
+        return socket && socket.readyState === WebSocket.OPEN;
+      }
+
+      function isSocketConnecting() {
+        return socket && socket.readyState === WebSocket.CONNECTING;
+      }
+
+      function scheduleReconnect(delayMs = 2000) {
+        if (reconnectTimer) return;
+
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          connect();
+        }, delayMs);
+      }
+
+      function reconnectNow({ requestState = false } = {}) {
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+
+        if (isSocketOpen()) {
+          if (requestState) {
+            sendCommand("requestState");
+          }
+          return;
+        }
+
+        if (requestState) {
+          requestStateAfterConnect = true;
+        }
+
+        if (isSocketConnecting()) {
+          return;
+        }
+
+        connect();
+      }
+
+      function refreshFromPhone() {
+        if (!isSocketOpen()) {
+          setStatus("переподключение по кнопке");
+        }
+
+        reconnectNow({ requestState: true });
+      }
+            
 
       function applyProgress(progress) {
         const duration = Number(progress?.duration) || 0;
@@ -949,6 +1035,8 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
       }
 
       function connect() {
+        if (isSocketOpen() || isSocketConnecting()) return;
+
         setStatus("подключение к серверу");
         socket = new WebSocket(bootstrap.wsOrigin + "/ws");
 
@@ -971,8 +1059,13 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
               setStatus("WS подключён");
               pairCodeEl.textContent = message.session?.pairCode || bootstrap.pairCode || "—";
               if (message.lastState) applyState(message.lastState);
-              break;
 
+              if (requestStateAfterConnect) {
+                requestStateAfterConnect = false;
+                sendCommand("requestState");
+              }
+
+              break;
             case "auth/paired":
               setStatus("сопряжение выполнено");
               pairCodeEl.textContent = message.pairCode || bootstrap.pairCode || "—";
@@ -1010,13 +1103,28 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
 
         socket.addEventListener("close", () => {
           setStatus("соединение закрыто, переподключение через 2с");
-          setTimeout(connect, 2000);
+          scheduleReconnect();
         });
 
         socket.addEventListener("error", () => {
           setStatus("ошибка сокета");
         });
       }
+      
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          reconnectNow({ requestState: true });
+        }
+      });
+
+      window.addEventListener("pageshow", () => {
+        reconnectNow({ requestState: true });
+      });
+
+      window.addEventListener("online", () => {
+        reconnectNow({ requestState: true });
+      });
+
 
       document.getElementById("prev").addEventListener("click", () => sendCommand("prev"));
       toggleEl.addEventListener("click", () => sendCommand("playPause"));
@@ -1036,7 +1144,7 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
         setLikeState(false);
         sendCommand("dislike");
       });
-      document.getElementById("refresh").addEventListener("click", () => sendCommand("requestState"));
+      document.getElementById("refresh").addEventListener("click", () => refreshFromPhone());
 
       volumeEl.addEventListener("pointerdown", (event) => {
         if (!isPointerOnRangeThumb(volumeEl, event)) {
@@ -1119,8 +1227,8 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
 
 const server = http.createServer(async (req, res) => {
   if (!req.url.startsWith("/api/health")) {
-  log(`HTTP request: ${req.method} ${req.url}`);
-}
+    log(`HTTP request: ${req.method} ${req.url}`);
+  }
 
   applyCors(res);
 
@@ -1138,7 +1246,7 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, {
         ok: true,
         now: new Date().toISOString(),
-        ...origins
+        ...origins,
       });
       return;
     }
@@ -1156,7 +1264,7 @@ const server = http.createServer(async (req, res) => {
       const remoteUrl = buildRemoteUrl({
         publicHttpOrigin: origins.publicHttpOrigin,
         pairCode: session.pairCode,
-        sessionId: session.sessionId
+        sessionId: session.sessionId,
       });
 
       const qrDataUrl = await createQrDataUrl(remoteUrl);
@@ -1170,7 +1278,7 @@ const server = http.createServer(async (req, res) => {
         publicHttpOrigin: origins.publicHttpOrigin,
         publicWsOrigin: origins.publicWsOrigin,
         remoteUrl,
-        qrDataUrl
+        qrDataUrl,
       });
       return;
     }
@@ -1185,8 +1293,8 @@ const server = http.createServer(async (req, res) => {
         renderRemoteHtml({
           publicWsOrigin: origins.publicWsOrigin,
           pairCode,
-          sessionId
-        })
+          sessionId,
+        }),
       );
       return;
     }
@@ -1214,7 +1322,7 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 wss.on("connection", (ws) => {
-  log("New WebSocket connection established");  
+  log("New WebSocket connection established");
   ws.isAlive = true;
 
   ws.on("pong", () => {
@@ -1222,7 +1330,7 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("message", (buffer) => {
-    //log(`Raw message: ${buffer}`);  
+    //log(`Raw message: ${buffer}`);
     const message = safeParseJson(String(buffer));
     if (!message || typeof message !== "object") {
       sendError(ws, "BAD_JSON", "Message must be valid JSON");
@@ -1232,12 +1340,14 @@ wss.on("connection", (ws) => {
     handleWsMessage(ws, message);
   });
 
-  ws.on("close", (code, reason) => {  // <-- изменено
+  ws.on("close", (code, reason) => {
+    // <-- изменено
     log(`Client closed connection: code=${code}, reason=${reason}`);
     clearSocket(ws);
   });
-  
-  ws.on("error", (err) => {  // <-- изменено
+
+  ws.on("error", (err) => {
+    // <-- изменено
     log(`WebSocket error: ${err.message || err}`);
     clearSocket(ws);
   });
@@ -1260,7 +1370,7 @@ setInterval(() => {
 
     safeSend(ws, {
       type: "server/ping",
-      at: new Date().toISOString()
+      at: new Date().toISOString(),
     });
   }
 }, CONFIG.HEARTBEAT_MS);
@@ -1289,7 +1399,9 @@ if (process.env.ENABLE_CLI === "1") {
         console.log("  stop          - остановка сервера");
         console.log("  debug on      - включить логирование");
         console.log("  debug off     - выключить логирование");
-        console.log("  heartbeat     - показать количество подключенных клиентов");
+        console.log(
+          "  heartbeat     - показать количество подключенных клиентов",
+        );
         console.log("  ip <IP>       - сменить HOST (требует перезапуска)");
         console.log("  port <PORT>   - сменить PORT (требует перезапуска)");
         break;
@@ -1320,7 +1432,9 @@ if (process.env.ENABLE_CLI === "1") {
           console.log(`Для смены IP на ${newIp} требуется перезапуск сервера.`);
         } else if (cmd.startsWith("port ")) {
           const newPort = cmd.split(" ")[1];
-          console.log(`Для смены порта на ${newPort} требуется перезапуск сервера.`);
+          console.log(
+            `Для смены порта на ${newPort} требуется перезапуск сервера.`,
+          );
         } else {
           console.log("Неизвестная команда. help для списка команд.");
         }
@@ -1328,4 +1442,3 @@ if (process.env.ENABLE_CLI === "1") {
     }
   });
 }
-
