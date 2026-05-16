@@ -1,6 +1,10 @@
 const defaultServerOrigin = "http://127.0.0.1:8099";
 
 const ui = {
+  loggingEnabled: document.getElementById("loggingEnabled"),
+  logDir: document.getElementById("logDir"),
+  saveLogging: document.getElementById("saveLogging"),
+  loggingStatus: document.getElementById("loggingStatus"),
   serverOrigin: document.getElementById("serverOrigin"),
   saveServer: document.getElementById("saveServer"),
   createSession: document.getElementById("createSession"),
@@ -16,7 +20,7 @@ const ui = {
   prevBtn: document.getElementById("prevBtn"),
   toggleBtn: document.getElementById("toggleBtn"),
   nextBtn: document.getElementById("nextBtn"),
-  openControl: document.getElementById("openControl")
+  openControl: document.getElementById("openControl"),
 };
 
 let renderTimer = null;
@@ -100,6 +104,7 @@ async function render() {
   }
 
   await renderServerHealth(serverOrigin);
+  await loadLoggingSettings(serverOrigin);
 }
 
 async function renderServerHealth(serverOrigin) {
@@ -115,6 +120,56 @@ async function renderServerHealth(serverOrigin) {
       `Сервер доступен. Public origin: ${data.publicHttpOrigin}`;
   } catch (error) {
     ui.serverHealth.textContent = `Сервер недоступен: ${error.message}`;
+  }
+}
+
+async function loadLoggingSettings(serverOrigin) {
+  try {
+    const response = await fetch(`${serverOrigin}/api/settings`);
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(data.error || `HTTP ${response.status}`);
+    }
+
+    ui.loggingEnabled.checked = Boolean(data.settings?.logging?.enabled);
+    ui.logDir.value = data.settings?.logging?.dir || "";
+    ui.loggingStatus.textContent = "Настройки логирования загружены";
+  } catch (error) {
+    ui.loggingStatus.textContent = `Не удалось загрузить настройки: ${error.message}`;
+  }
+}
+
+async function saveLoggingSettings() {
+  const serverOrigin = normalizeOrigin(
+    ui.serverOrigin.value || defaultServerOrigin,
+  );
+
+  try {
+    const response = await fetch(`${serverOrigin}/api/settings`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        logging: {
+          enabled: ui.loggingEnabled.checked,
+          dir: ui.logDir.value.trim(),
+        },
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(data.error || `HTTP ${response.status}`);
+    }
+
+    ui.loggingStatus.textContent = ui.loggingEnabled.checked
+      ? "Логирование включено"
+      : "Логирование выключено";
+  } catch (error) {
+    ui.loggingStatus.textContent = `Не удалось сохранить: ${error.message}`;
   }
 }
 
@@ -209,6 +264,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
+  ui.saveLogging.addEventListener("click", () => {
+    void saveLoggingSettings();
+  });
+  
   ui.prevBtn.addEventListener("click", () => void sendPlayerCommand("prev"));
   ui.toggleBtn.addEventListener("click", () => void sendPlayerCommand("playPause"));
   ui.nextBtn.addEventListener("click", () => void sendPlayerCommand("next"));

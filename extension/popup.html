@@ -120,6 +120,26 @@
   </section>
 
   <section class="card">
+    <div><strong>Диагностика</strong></div>
+  
+    <label class="row" style="align-items: center;">
+      <input id="loggingEnabled" type="checkbox" style="width: auto; min-height: 0;" />
+      <span>Включить логирование</span>
+    </label>
+  
+    <div class="row">
+      <input id="logDir" type="text" placeholder="Папка логов на сервере" />
+    </div>
+  
+    <div class="row">
+      <button id="saveLogging" class="secondary">Сохранить</button>
+    </div>
+  
+    <div class="muted" id="loggingStatus">Настройки логирования ещё не загружены</div>
+  </section>
+
+
+  <section class="card">
     <a href="#" id="openControl">Открыть расширенную панель</a>
   </section>
 

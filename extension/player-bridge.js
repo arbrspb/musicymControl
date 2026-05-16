@@ -161,6 +161,24 @@
     throw new Error("window.externalAPI не инициализировался");
   }
 
+  function getAudioInfo() {
+    const items = [...document.querySelectorAll("audio")].map(
+      (audio, index) => ({
+        index,
+        paused: audio.paused,
+        ended: audio.ended,
+        currentTime: Number((audio.currentTime || 0).toFixed(1)),
+        src: audio.currentSrc || "",
+      }),
+    );
+
+    return {
+      totalCount: items.length,
+      playingCount: items.filter((item) => !item.paused && !item.ended).length,
+      items,
+    };
+  }
+
   function snapshot(event = "snapshot") {
     const api = window.externalAPI;
     const trackIndex = safe(() => api.getTrackIndex(), -1);
@@ -181,8 +199,12 @@
       shuffle: safe(() => api.getShuffle()),
       repeat: safe(() => api.getRepeat()),
       isPlaying: safe(() => api.isPlaying()),
-      vibe: safe(() => getVibeInfo(api), null)
-
+      audio: safe(() => getAudioInfo(), {
+        totalCount: 0,
+        playingCount: 0,
+        items: [],
+      }),
+      vibe: safe(() => getVibeInfo(api), null),
     };
   }
 
@@ -213,6 +235,13 @@
 
     subscriptionsInstalled = true;
     post("PLAYER_READY", snapshot("bootstrap"));
+    const initialState = snapshot("bootstrap-audio-check");
+    if (initialState.audio?.playingCount > 1) {
+      post("PLAYER_DIAGNOSTIC", {
+        event: "audio.multiple-playing",
+        state: initialState,
+      });
+    }    
   }
 
   async function execute(action, payload = {}) {
@@ -297,6 +326,12 @@
         );
 
         const state = snapshot(data.action);
+        if (state.audio?.playingCount > 1) {
+          post("PLAYER_DIAGNOSTIC", {
+            event: "audio.multiple-playing",
+            state,
+          });
+        }        
         post("COMMAND_RESULT", {
           requestId: data.requestId,
           ok: true,

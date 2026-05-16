@@ -1,0 +1,12 @@
+{
+  "host": "0.0.0.0",
+  "port": 8099,
+  "publicHttpOrigin": "",
+  "sessionTtlMs": 600000,
+  "heartbeatMs": 20000,
+  "logging": {
+    "enabled": false,
+    "console": false,
+    "dir": ""
+  }
+}

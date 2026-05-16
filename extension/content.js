@@ -43,6 +43,15 @@ window.addEventListener("message", (event) => {
       payload: data.payload
     });
   }
+  if (data.type === "PLAYER_DIAGNOSTIC") {
+    void sendToBackground({
+      type: "content/player-event",
+      payload: {
+        event: data.payload?.event || "diagnostic",
+        ...data.payload?.state,
+      },
+    });
+  }
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

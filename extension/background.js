@@ -5,6 +5,7 @@ const YANDEX_URL_PATTERNS = [
 ];
 
 const DEFAULT_STATE = {
+  diagnosticsEnabled: false,
   serverHttpOrigin: "http://127.0.0.1:8099",
   sessionId: null,
   pairCode: null,
@@ -82,6 +83,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       case "content/player-event": {
         await setState({ lastPlayerState: message.payload });
+        sendDiagnostics("extension.player.event", {
+          event: message.payload?.event || "unknown",
+          isPlaying: message.payload?.isPlaying ?? null,
+          trackTitle: message.payload?.track?.title || null,
+          audioPlayingCount: message.payload?.audio?.playingCount ?? null,
+        });
+        
         const state = await getState();
 
         sendWs({
@@ -97,6 +105,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.payload?.state) {
           await setState({ lastPlayerState: message.payload.state });
         }
+        sendDiagnostics("extension.command.result", {
+          requestId: message.payload?.requestId || null,
+          ok: Boolean(message.payload?.ok),
+          isPlaying: message.payload?.state?.isPlaying ?? null,
+          trackTitle: message.payload?.state?.track?.title || null,
+          audioPlayingCount:
+            message.payload?.state?.audio?.playingCount ?? null,
+        });
 
         const state = await getState();
 
@@ -305,6 +321,8 @@ async function connectWs(force = false) {
   ws.addEventListener("open", () => {
     reconnectAttempt = 0;
     void setState({ wsConnected: true });
+    sendDiagnostics("extension.ws.open");
+
 
     sendWs({
       type: "hello",
@@ -337,6 +355,10 @@ ws.addEventListener("close", (event) => {
         }
       : {})
   });
+  sendDiagnostics("extension.ws.close", {
+    code: event.code,
+    reason: event.reason || "",
+  });
 
   if (!sessionMissing) {
     scheduleReconnect();
@@ -344,6 +366,7 @@ ws.addEventListener("close", (event) => {
 });
 
   ws.addEventListener("error", () => {
+    sendDiagnostics("extension.ws.error");
     void setState({ wsConnected: false });
   });
 }
@@ -402,9 +425,13 @@ async function handleServerMessage(message) {
 
     case "command": {
       try {
+        sendDiagnostics("extension.command.received", {
+          action: message.action,
+          requestId: message.requestId || null,
+        });        
         await forwardCommandToPlayer({
           action: message.action,
-          payload: message.payload || {}
+          payload: message.payload || {},
         });
       } catch (error) {
         sendWs({
@@ -412,7 +439,7 @@ async function handleServerMessage(message) {
           requestId: message.requestId,
           sessionId: message.sessionId,
           ok: false,
-          error: error.message
+          error: error.message,
         });
       }
       return;
@@ -425,6 +452,13 @@ async function handleServerMessage(message) {
     case "error":
       console.warn("[server:error]", message.code, message.message);
       return;
+    
+    case "diagnostics/config":
+      await setState({ diagnosticsEnabled: Boolean(message.enabled) });
+      sendDiagnostics("extension.diagnostics.config", {
+        enabled: Boolean(message.enabled),
+      });
+      return;
 
     default:
       return;
@@ -435,6 +469,18 @@ function sendWs(payload) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return false;
   ws.send(JSON.stringify(payload));
   return true;
+}
+
+function sendDiagnostics(event, data = {}) {
+  void getState().then((state) => {
+    if (!state.diagnosticsEnabled) return;
+
+    sendWs({
+      type: "diagnostics/event",
+      event,
+      data,
+    });
+  });
 }
 
 function safeParseJson(value) {

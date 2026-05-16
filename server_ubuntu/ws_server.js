@@ -12,21 +12,99 @@ const {
 const { execFileSync } = require("node:child_process");
 const LAN_ADDRESS = getLanAddress();
 
+const appDir = process.pkg ? path.dirname(process.execPath) : __dirname;
+const settingsFile = path.join(appDir, "settings.json");
+
+const DEFAULT_SETTINGS = {
+  host: "0.0.0.0",
+  port: 8099,
+  publicHttpOrigin: "",
+  sessionTtlMs: 10 * 60 * 1000,
+  heartbeatMs: 20 * 1000,
+  logging: {
+    enabled: false,
+    console: false,
+    dir: "",
+  },
+};
+
+function mergeSettings(base, patch) {
+  return {
+    ...base,
+    ...patch,
+    logging: {
+      ...base.logging,
+      ...(patch?.logging || {}),
+    },
+  };
+}
+
+function loadSettings() {
+  try {
+    if (!fs.existsSync(settingsFile)) {
+      fs.writeFileSync(
+        settingsFile,
+        JSON.stringify(DEFAULT_SETTINGS, null, 2),
+        "utf8",
+      );
+      return structuredClone(DEFAULT_SETTINGS);
+    }
+
+    const parsed = JSON.parse(fs.readFileSync(settingsFile, "utf8"));
+    return mergeSettings(DEFAULT_SETTINGS, parsed);
+  } catch (error) {
+    console.error("[settings] Failed to read settings.json:", error);
+    return structuredClone(DEFAULT_SETTINGS);
+  }
+}
+
+function saveSettings() {
+  try {
+    fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2), "utf8");
+  } catch (error) {
+    console.error("[settings] Failed to save settings.json:", error);
+  }
+}
+
+let settings = loadSettings();
+
 const CONFIG = {
-  HOST: process.env.HOST || "0.0.0.0",
-  PORT: Number(process.env.PORT || 8099),
-  SESSION_TTL_MS: Number(process.env.SESSION_TTL_MS || 10 * 60 * 1000),
-  HEARTBEAT_MS: Number(process.env.HEARTBEAT_MS || 20 * 1000),
-  PUBLIC_HTTP_ORIGIN: process.env.PUBLIC_HTTP_ORIGIN || "",
-  DEBUG: process.env.DEBUG === "1" || process.env.DEBUG === "true",
+  HOST: process.env.HOST || settings.host,
+  PORT: Number(process.env.PORT || settings.port),
+  SESSION_TTL_MS: Number(process.env.SESSION_TTL_MS || settings.sessionTtlMs),
+  HEARTBEAT_MS: Number(process.env.HEARTBEAT_MS || settings.heartbeatMs),
+  PUBLIC_HTTP_ORIGIN:
+    process.env.PUBLIC_HTTP_ORIGIN || settings.publicHttpOrigin,
+  DEBUG:
+    process.env.DEBUG === "1" ||
+    process.env.DEBUG === "true" ||
+    Boolean(settings.logging.enabled),
   DEBUG_CONSOLE:
-    process.env.DEBUG_CONSOLE === "1" || process.env.DEBUG_CONSOLE === "true",
+    process.env.DEBUG_CONSOLE === "1" ||
+    process.env.DEBUG_CONSOLE === "true" ||
+    Boolean(settings.logging.console),
 };
 
 const sessions = new Map();
 
-const appDir = process.pkg ? path.dirname(process.execPath) : __dirname;
-const logFile = path.join(appDir, "server.log");
+function getLogDir() {
+  return settings.logging.dir || appDir;
+}
+
+function ensureLogDir() {
+  const dir = getLogDir();
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function getServerLogFile() {
+  return path.join(ensureLogDir(), "server.log");
+}
+
+function getTraceLogFile() {
+  const date = new Date().toISOString().slice(0, 10);
+  return path.join(ensureLogDir(), `trace-${date}.jsonl`);
+}
 
 function log(message) {
   if (!CONFIG.DEBUG) return;
@@ -39,9 +117,26 @@ function log(message) {
   }
 
   try {
-    fs.appendFileSync(logFile, line);
+    fs.appendFileSync(getServerLogFile(), line);
   } catch (e) {
     console.error("Log write failed:", e);
+  }
+}
+
+function trace(source, event, data = {}) {
+  if (!settings.logging.enabled) return;
+
+  const record = {
+    at: new Date().toISOString(),
+    source,
+    event,
+    ...data,
+  };
+
+  try {
+    fs.appendFileSync(getTraceLogFile(), JSON.stringify(record) + "\n");
+  } catch (error) {
+    console.error("[trace] Log write failed:", error);
   }
 }
 
@@ -199,6 +294,11 @@ function createSession(meta = {}) {
   log(
     `New session created: ${session.sessionId}, pairCode: ${session.pairCode}`,
   );
+  trace("server", "session.created", {
+    sessionId: session.sessionId,
+    pairCode: session.pairCode,
+  });
+
   return session;
 }
 
@@ -243,6 +343,11 @@ function bindSocket(session, role, ws) {
 
   session[role] = ws;
   log(`Socket bound: role=${role}, sessionId=${session.sessionId}`);
+  trace("server", "socket.bound", {
+    role,
+    sessionId: session.sessionId,
+  });
+
   ws.sessionId = session.sessionId;
   ws.role = role;
   ws.isAlive = true;
@@ -260,6 +365,10 @@ function clearSocket(ws) {
   if (session[role] === ws) {
     session[role] = null;
     log(`Socket cleared: role=${role}, sessionId=${sessionId}`);
+    trace("server", "socket.cleared", {
+      role,
+      sessionId,
+    });
   }
 
   const peerRole = role === "extension" ? "phone" : "extension";
@@ -322,6 +431,11 @@ function handleHello(ws, message) {
       lastState: session.lastState,
     });
 
+    safeSend(ws, {
+      type: "diagnostics/config",
+      enabled: Boolean(settings.logging.enabled),
+    });
+
     if (session.phone) {
       safeSend(ws, {
         type: "auth/paired",
@@ -359,6 +473,11 @@ function handleHello(ws, message) {
   });
 
   safeSend(ws, {
+    type: "diagnostics/config",
+    enabled: Boolean(settings.logging.enabled),
+  });
+
+  safeSend(ws, {
     type: "auth/paired",
     sessionId: session.sessionId,
     pairCode: session.pairCode,
@@ -383,6 +502,13 @@ function handleCommand(ws, message) {
   log(
     `handleCommand from ${ws.role}: action=${message.action}, payload=${JSON.stringify(message.payload)}`,
   );
+  trace("server", "command.received", {
+    role: ws.role,
+    action: message.action,
+    requestId: message.requestId || null,
+    payload: message.payload || {},
+  });
+
   if (ws.role !== "phone") {
     sendError(ws, "FORBIDDEN", "Only phone clients can send commands");
     return;
@@ -435,6 +561,13 @@ function handleStateUpdate(ws, message) {
   }
 
   touchSession(session);
+  trace("server", "state.update", {
+    role: ws.role,
+    sessionId: session.sessionId,
+    event: message.state?.event || "unknown",
+    isPlaying: message.state?.isPlaying ?? null,
+    trackTitle: message.state?.track?.title || null,
+  });
 
   session.lastState = {
     ...message.state,
@@ -445,6 +578,23 @@ function handleStateUpdate(ws, message) {
     type: "state/update",
     sessionId: session.sessionId,
     state: session.lastState,
+  });
+}
+
+function handleDiagnosticsEvent(ws, message) {
+  const session = socketSession(ws);
+  if (!session) {
+    sendError(
+      ws,
+      "SESSION_NOT_FOUND",
+      "Session is not attached to this socket",
+    );
+    return;
+  }
+
+  trace(ws.role || "unknown", message.event || "diagnostics.unknown", {
+    sessionId: session.sessionId,
+    data: message.data || {},
   });
 }
 
@@ -472,6 +622,14 @@ function handleCommandResult(ws, message) {
   }
 
   touchSession(session);
+  trace("server", "command.result", {
+    role: ws.role,
+    sessionId: session.sessionId,
+    requestId: message.requestId || null,
+    ok: Boolean(message.ok),
+    isPlaying: message.state?.isPlaying ?? null,
+    trackTitle: message.state?.track?.title || null,
+  });
 
   safeSend(session.phone, {
     type: "command/result",
@@ -504,6 +662,13 @@ function handleWsMessage(ws, message) {
       if (session) touchSession(session);
       return;
     }
+    case "diagnostics/event":
+      handleDiagnosticsEvent(ws, message);
+      return;
+    case "diagnostics/config":
+      diagnosticsEnabled = Boolean(message.enabled);
+      break;
+
     default:
       sendError(ws, "UNKNOWN_MESSAGE", `Unknown message type: ${message.type}`);
   }
@@ -661,6 +826,7 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
 
       let socket = null;
       let reconnectTimer = null;
+      let diagnosticsEnabled = false;
       let requestStateAfterConnect = false;
       let isSeeking = false;
       let lastSeekKey = "";
@@ -854,7 +1020,23 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
         socket.send(JSON.stringify(message));
       }
 
+      function sendDiagnostics(event, data = {}) {
+        if (!diagnosticsEnabled) return;
+
+        send({
+          type: "diagnostics/event",
+          event,
+          data
+        });
+      }
+      
       function sendCommand(action, payload = {}) {
+        sendDiagnostics("phone.command.click", {
+          action,
+          uiIsPlaying: toggleEl.getAttribute("aria-pressed") === "true",
+          visibilityState: document.visibilityState
+        });
+      
         send({
           type: "command",
           requestId: requestId(),
@@ -1042,6 +1224,10 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
 
         socket.addEventListener("open", () => {
           setStatus("ожидание pairing");
+          sendDiagnostics("phone.ws.open", {
+            visibilityState: document.visibilityState
+          });
+          
           send({
             type: "hello",
             role: "phone",
@@ -1059,6 +1245,10 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
               setStatus("WS подключён");
               pairCodeEl.textContent = message.session?.pairCode || bootstrap.pairCode || "—";
               if (message.lastState) applyState(message.lastState);
+              sendDiagnostics("phone.hello.ack", {
+                hasLastState: Boolean(message.lastState)
+              });
+              
 
               if (requestStateAfterConnect) {
                 requestStateAfterConnect = false;
@@ -1103,25 +1293,44 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
 
         socket.addEventListener("close", () => {
           setStatus("соединение закрыто, переподключение через 2с");
+          sendDiagnostics("phone.ws.close", {
+            visibilityState: document.visibilityState
+          });          
           scheduleReconnect();
         });
 
         socket.addEventListener("error", () => {
           setStatus("ошибка сокета");
+          sendDiagnostics("phone.ws.error", {
+            visibilityState: document.visibilityState
+          });          
         });
       }
       
       document.addEventListener("visibilitychange", () => {
+        sendDiagnostics("phone.visibility.change", {
+          visibilityState: document.visibilityState
+        });
+
         if (document.visibilityState === "visible") {
           reconnectNow({ requestState: true });
         }
       });
 
+
       window.addEventListener("pageshow", () => {
+        sendDiagnostics("phone.pageshow", {
+          visibilityState: document.visibilityState
+        });
+
         reconnectNow({ requestState: true });
       });
 
       window.addEventListener("online", () => {
+        sendDiagnostics("phone.online", {
+          visibilityState: document.visibilityState
+        });
+
         reconnectNow({ requestState: true });
       });
 
@@ -1242,6 +1451,57 @@ const server = http.createServer(async (req, res) => {
   const origins = getServerOrigins();
 
   try {
+    if (requestUrl.pathname === "/api/settings" && req.method === "GET") {
+      sendJson(res, 200, {
+        ok: true,
+        settings: {
+          logging: settings.logging,
+        },
+      });
+      return;
+    }
+
+    if (requestUrl.pathname === "/api/settings" && req.method === "PATCH") {
+      const body = safeParseJson(await readBody(req)) || {};
+      const nextLogging = {
+        ...settings.logging,
+        ...(body.logging || {}),
+      };
+
+      settings = {
+        ...settings,
+        logging: nextLogging,
+      };
+
+      CONFIG.DEBUG = Boolean(settings.logging.enabled);
+      CONFIG.DEBUG_CONSOLE = Boolean(settings.logging.console);
+
+      saveSettings();
+      for (const session of sessions.values()) {
+        safeSend(session.extension, {
+          type: "diagnostics/config",
+          enabled: Boolean(settings.logging.enabled),
+        });
+
+        safeSend(session.phone, {
+          type: "diagnostics/config",
+          enabled: Boolean(settings.logging.enabled),
+        });
+      }
+
+      trace("server", "settings.updated", {
+        logging: settings.logging,
+      });
+
+      sendJson(res, 200, {
+        ok: true,
+        settings: {
+          logging: settings.logging,
+        },
+      });
+      return;
+    }
+
     if (requestUrl.pathname === "/api/health" && req.method === "GET") {
       sendJson(res, 200, {
         ok: true,
