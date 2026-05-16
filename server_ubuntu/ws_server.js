@@ -39,6 +39,10 @@ function mergeSettings(base, patch) {
   };
 }
 
+function cloneDefaultSettings() {
+  return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+}
+
 function loadSettings() {
   try {
     if (!fs.existsSync(settingsFile)) {
@@ -47,14 +51,14 @@ function loadSettings() {
         JSON.stringify(DEFAULT_SETTINGS, null, 2),
         "utf8",
       );
-      return structuredClone(DEFAULT_SETTINGS);
+      return cloneDefaultSettings();
     }
 
     const parsed = JSON.parse(fs.readFileSync(settingsFile, "utf8"));
     return mergeSettings(DEFAULT_SETTINGS, parsed);
   } catch (error) {
     console.error("[settings] Failed to read settings.json:", error);
-    return structuredClone(DEFAULT_SETTINGS);
+    return cloneDefaultSettings();
   }
 }
 
@@ -224,7 +228,7 @@ function getServerOrigins() {
 
 function applyCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
@@ -665,10 +669,6 @@ function handleWsMessage(ws, message) {
     case "diagnostics/event":
       handleDiagnosticsEvent(ws, message);
       return;
-    case "diagnostics/config":
-      diagnosticsEnabled = Boolean(message.enabled);
-      break;
-
     default:
       sendError(ws, "UNKNOWN_MESSAGE", `Unknown message type: ${message.type}`);
   }
@@ -1259,6 +1259,10 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
             case "auth/paired":
               setStatus("сопряжение выполнено");
               pairCodeEl.textContent = message.pairCode || bootstrap.pairCode || "—";
+              break;
+              
+            case "diagnostics/config":
+              diagnosticsEnabled = Boolean(message.enabled);
               break;
 
             case "state/update":
