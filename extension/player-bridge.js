@@ -319,6 +319,9 @@
       case "selectVibePreset":
         return api.selectVibePreset(String(payload.id || ""));
 
+      case "startTrackWave":
+        return api.startTrackWave();
+
       case "toggleShuffle":
         return api.toggleShuffle(payload.state);
 

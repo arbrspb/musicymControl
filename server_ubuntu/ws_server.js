@@ -720,6 +720,7 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
     details.card[open] > summary::after { content: "⌃"; }
     .queue-list { display: grid; gap: 8px; margin-top: 12px; }
     .vibe-list { display: grid; gap: 8px; margin-top: 12px; }
+    .track-wave-button { width: 100%; margin-top: 12px; min-height: 52px; flex: 0 0 auto; }    
     .vibe-preset { width: 100%; min-height: 52px; flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #111827; color: #f9fafb; text-align: left; }
     .vibe-preset:active { background: #2563eb; }
     .vibe-preset.is-active { outline: 2px solid #facc15; color: #facc15; }
@@ -793,8 +794,10 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
        
     <details class="card vibe-card">
       <summary>Моя волна <span class="status" id="vibeCurrent"></span></summary>
+      <button class="secondary track-wave-button" id="trackWave" type="button" disabled>Моя волна по треку</button>
       <div class="vibe-list" id="vibeList"></div>
     </details>
+
 
     <details class="card">
       <summary>Pair code: <strong id="pairCode"></strong></summary>
@@ -822,6 +825,7 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
       const queueCountEl = document.getElementById("queueCount");
       const vibeListEl = document.getElementById("vibeList");
       const vibeCurrentEl = document.getElementById("vibeCurrent");
+      const trackWaveEl = document.getElementById("trackWave");
 
 
       let socket = null;
@@ -1153,6 +1157,12 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
         nextEl.title = nextReady ? "" : "Следующие треки еще не подгрузились";
       }
 
+      function applyTrackWaveState(state) {
+        const enabled = Boolean(state?.track);
+        trackWaveEl.disabled = !enabled;
+        trackWaveEl.title = enabled ? "" : "Сначала должен быть выбран трек";
+      }
+
       function commitPosition() {
         const duration = Number(positionEl.max) || 0;
         if (duration <= 0) return;
@@ -1220,6 +1230,7 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
         applyVolume(state?.volume);
         applyPlaybackState(state);
         applyNavigationState(state);
+        applyTrackWaveState(state);
 
         applyReactions(track);
         applyProgress(state?.progress);
@@ -1369,6 +1380,10 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
         setLikeState(false);
         sendCommand("dislike");
       });
+      trackWaveEl.addEventListener("click", () => {
+        sendCommand("startTrackWave");
+      });
+
       document.getElementById("refresh").addEventListener("click", () => refreshFromPhone());
 
       volumeEl.addEventListener("pointerdown", (event) => {
