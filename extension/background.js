@@ -195,10 +195,25 @@ function httpOriginToWsUrl(origin) {
   return url.toString();
 }
 
+async function getYandexTabs() {
+  return chrome.tabs.query({ url: YANDEX_URL_PATTERNS });
+}
+
+function compactTab(tab) {
+  return {
+    id: tab.id ?? null,
+    active: Boolean(tab.active),
+    audible: Boolean(tab.audible),
+    muted: Boolean(tab.mutedInfo?.muted),
+    url: tab.url || "",
+  };
+}
+
 async function getFirstYandexTab() {
-  const tabs = await chrome.tabs.query({ url: YANDEX_URL_PATTERNS });
+  const tabs = await getYandexTabs();
   return tabs[0] || null;
 }
+
 
 async function checkPlayerTabStatus() {
   const tab = await getFirstYandexTab();
@@ -289,6 +304,13 @@ async function forwardCommandToPlayer({ action, payload, requestId }) {
   if (!tab?.id) {
     throw new Error("Не найдена открытая вкладка Яндекс Музыки");
   }
+  sendDiagnostics("extension.player.tab.selected", {
+    requestId: requestId || null,
+    action,
+    tabId: tab.id,
+    audible: Boolean(tab.audible),
+    url: tab.url || "",
+  });
 
   return chrome.tabs.sendMessage(tab.id, {
     type: "PLAYER_COMMAND",
@@ -428,6 +450,14 @@ async function handleServerMessage(message) {
         sendDiagnostics("extension.command.received", {
           action: message.action,
           requestId: message.requestId || null,
+        }); 
+        const tabs = await getYandexTabs();
+        sendDiagnostics("extension.player.tabs.before-command", {
+          requestId: message.requestId || null,
+          action: message.action,
+          totalTabs: tabs.length,
+          audibleTabs: tabs.filter((tab) => tab.audible).length,
+          tabs: tabs.map(compactTab),
         });        
         await forwardCommandToPlayer({
           action: message.action,

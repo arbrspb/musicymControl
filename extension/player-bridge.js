@@ -4,6 +4,39 @@
 
   let subscriptionsInstalled = false;
   let lastNavigationAt = 0;
+  let lastAudioPlayingCount = null;
+  
+  function postDiagnostic(event, state, meta = {}) {
+    post("PLAYER_DIAGNOSTIC", {
+      event,
+      state,
+      meta,
+    });
+  }
+
+  function checkAudioState(state, triggerEvent) {
+    const nextCount = state.audio?.playingCount ?? null;
+
+    if (
+      lastAudioPlayingCount !== null &&
+      nextCount !== null &&
+      nextCount !== lastAudioPlayingCount
+    ) {
+      postDiagnostic("audio.playing-count.changed", state, {
+        triggerEvent,
+        from: lastAudioPlayingCount,
+        to: nextCount,
+      });
+    }
+
+    if (nextCount > 1) {
+      postDiagnostic("audio.multiple-playing", state, {
+        triggerEvent,
+      });
+    }
+
+    lastAudioPlayingCount = nextCount;
+  }  
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -229,19 +262,16 @@
       if (!eventName) continue;
 
       api.on(eventName, () => {
-        post("PLAYER_SNAPSHOT", snapshot(key));
+        const state = snapshot(key);
+        post("PLAYER_SNAPSHOT", state);
+        checkAudioState(state, key);
       });
     }
 
     subscriptionsInstalled = true;
     post("PLAYER_READY", snapshot("bootstrap"));
     const initialState = snapshot("bootstrap-audio-check");
-    if (initialState.audio?.playingCount > 1) {
-      post("PLAYER_DIAGNOSTIC", {
-        event: "audio.multiple-playing",
-        state: initialState,
-      });
-    }    
+    checkAudioState(initialState, "bootstrap-audio-check");
   }
 
   async function execute(action, payload = {}) {
@@ -309,34 +339,43 @@
     try {
       await installSubscriptions();
 
-      if (data.type === "PLAYER_REQUEST_STATE") {
-        const state = snapshot("requestState");
-        post("COMMAND_RESULT", {
-          requestId: data.requestId,
-          ok: true,
-          result: state,
-          state
-        });
-        return;
-      }
-
       if (data.type === "PLAYER_COMMAND") {
+        const beforeState = snapshot(`${data.action}.before`);
+        postDiagnostic("player.command.before", beforeState, {
+          requestId: data.requestId,
+          action: data.action,
+        });
+
         const result = await Promise.resolve(
-          execute(data.action, data.payload || {})
+          execute(data.action, data.payload || {}),
         );
 
         const state = snapshot(data.action);
-        if (state.audio?.playingCount > 1) {
-          post("PLAYER_DIAGNOSTIC", {
-            event: "audio.multiple-playing",
-            state,
-          });
-        }        
+        postDiagnostic("player.command.after", state, {
+          requestId: data.requestId,
+          action: data.action,
+        });
+        checkAudioState(state, `${data.action}.after`);
+
+        if (["playPause", "play", "pause"].includes(data.action)) {
+          for (const delayMs of [80, 300]) {
+            setTimeout(() => {
+              const delayedState = snapshot(`${data.action}.after-${delayMs}ms`);
+              postDiagnostic("player.command.after-delay", delayedState, {
+                requestId: data.requestId,
+                action: data.action,
+                delayMs,
+              });
+              checkAudioState(delayedState, `${data.action}.after-${delayMs}ms`);
+            }, delayMs);
+          }
+        }
+
         post("COMMAND_RESULT", {
           requestId: data.requestId,
           ok: true,
           result,
-          state
+          state,
         });
       }
     } catch (error) {

@@ -48,6 +48,7 @@ window.addEventListener("message", (event) => {
       type: "content/player-event",
       payload: {
         event: data.payload?.event || "diagnostic",
+        diagnostic: data.payload?.meta || {},
         ...data.payload?.state,
       },
     });
