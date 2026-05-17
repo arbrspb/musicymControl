@@ -108,7 +108,6 @@ await renderServerHealth(serverOrigin);
 
 if (!loggingSettingsLoaded) {
   await loadLoggingSettings(serverOrigin);
-  loggingSettingsLoaded = true;
 }
 
 }
@@ -121,9 +120,6 @@ async function renderServerHealth(serverOrigin) {
     if (!response.ok || !data.ok) {
       throw new Error(data.error || `HTTP ${response.status}`);
     }
-    ui.loggingEnabled.checked = Boolean(data.settings?.logging?.enabled);
-    ui.logDir.value = data.settings?.logging?.dir || "";
-    loggingSettingsLoaded = true;
 
     ui.serverHealth.textContent =
       `Сервер доступен. Public origin: ${data.publicHttpOrigin}`;
@@ -141,8 +137,6 @@ async function loadLoggingSettings(serverOrigin) {
       throw new Error(data.error || `HTTP ${response.status}`);
     }
 
-    ui.loggingEnabled.checked = Boolean(data.settings?.logging?.enabled);
-    ui.logDir.value = data.settings?.logging?.dir || "";
     ui.loggingStatus.textContent = "Настройки логирования загружены";
   } catch (error) {
     ui.loggingStatus.textContent = `Не удалось загрузить настройки: ${error.message}`;
@@ -173,6 +167,9 @@ async function saveLoggingSettings() {
     if (!response.ok || !data.ok) {
       throw new Error(data.error || `HTTP ${response.status}`);
     }
+    ui.loggingEnabled.checked = Boolean(data.settings?.logging?.enabled);
+    ui.logDir.value = data.settings?.logging?.dir || "";
+    loggingSettingsLoaded = true;
 
     ui.loggingStatus.textContent = ui.loggingEnabled.checked
       ? "Логирование включено"
