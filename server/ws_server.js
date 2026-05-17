@@ -1087,11 +1087,23 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
       }
 
       function refreshFromPhone() {
-        if (!isSocketOpen()) {
-          setStatus("переподключение по кнопке");
+        setStatus("принудительное переподключение");
+
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
         }
 
-        reconnectNow({ requestState: true });
+        requestStateAfterConnect = true;
+
+        if (socket) {
+          try {
+            socket.close();
+          } catch {}
+          socket = null;
+        }
+
+        connect();
       }
             
 
