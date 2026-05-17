@@ -88,7 +88,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           isPlaying: message.payload?.isPlaying ?? null,
           trackTitle: message.payload?.track?.title || null,
           audioPlayingCount: message.payload?.audio?.playingCount ?? null,
+          diagnostic: message.payload?.diagnostic || null,
         });
+
         
         const state = await getState();
 

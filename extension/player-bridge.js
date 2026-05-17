@@ -339,6 +339,17 @@
     try {
       await installSubscriptions();
 
+      if (data.type === "PLAYER_REQUEST_STATE") {
+        const state = snapshot("requestState");
+        post("COMMAND_RESULT", {
+          requestId: data.requestId,
+          ok: true,
+          result: state,
+          state,
+        });
+        return;
+      }
+
       if (data.type === "PLAYER_COMMAND") {
         const beforeState = snapshot(`${data.action}.before`);
         postDiagnostic("player.command.before", beforeState, {
