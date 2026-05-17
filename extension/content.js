@@ -47,9 +47,12 @@ window.addEventListener("message", (event) => {
     void sendToBackground({
       type: "content/player-event",
       payload: {
-        event: data.payload?.event || "diagnostic",
-        diagnostic: data.payload?.meta || {},
         ...data.payload?.state,
+        event: data.payload?.event || "diagnostic",
+        diagnostic: {
+          ...(data.payload?.meta || {}),
+          stateEvent: data.payload?.state?.event || null,
+        },
       },
     });
   }
