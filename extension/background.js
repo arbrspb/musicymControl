@@ -284,7 +284,7 @@ async function requestPlayerState() {
   return true;
 }
 
-async function forwardCommandToPlayer({ action, payload }) {
+async function forwardCommandToPlayer({ action, payload, requestId }) {
   const tab = await getFirstYandexTab();
   if (!tab?.id) {
     throw new Error("Не найдена открытая вкладка Яндекс Музыки");
@@ -294,7 +294,7 @@ async function forwardCommandToPlayer({ action, payload }) {
     type: "PLAYER_COMMAND",
     action,
     payload,
-    requestId: crypto.randomUUID()
+    requestId: requestId || crypto.randomUUID(),
   });
 }
 
@@ -432,6 +432,7 @@ async function handleServerMessage(message) {
         await forwardCommandToPlayer({
           action: message.action,
           payload: message.payload || {},
+          requestId: message.requestId,
         });
       } catch (error) {
         sendWs({
