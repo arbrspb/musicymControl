@@ -24,6 +24,7 @@ const ui = {
 };
 
 let renderTimer = null;
+let loggingSettingsLoaded = false;
 
 function scheduleRender() {
   if (renderTimer) clearTimeout(renderTimer);
@@ -103,8 +104,13 @@ async function render() {
     ui.qrImage.removeAttribute("src");
   }
 
-  await renderServerHealth(serverOrigin);
+await renderServerHealth(serverOrigin);
+
+if (!loggingSettingsLoaded) {
   await loadLoggingSettings(serverOrigin);
+  loggingSettingsLoaded = true;
+}
+
 }
 
 async function renderServerHealth(serverOrigin) {
@@ -115,6 +121,9 @@ async function renderServerHealth(serverOrigin) {
     if (!response.ok || !data.ok) {
       throw new Error(data.error || `HTTP ${response.status}`);
     }
+    ui.loggingEnabled.checked = Boolean(data.settings?.logging?.enabled);
+    ui.logDir.value = data.settings?.logging?.dir || "";
+    loggingSettingsLoaded = true;
 
     ui.serverHealth.textContent =
       `Сервер доступен. Public origin: ${data.publicHttpOrigin}`;
