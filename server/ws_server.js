@@ -4,7 +4,11 @@ const crypto = require("node:crypto");
 const fs = require("fs");
 const path = require("path");
 const { WebSocketServer, WebSocket } = require("ws");
-const { createPairCode, buildRemoteUrl, createQrDataUrl } = require("./qr_utils");
+const {
+  createPairCode,
+  buildRemoteUrl,
+  createQrDataUrl,
+} = require("./qr_utils");
 const { execFileSync } = require("node:child_process");
 const LAN_ADDRESS = getLanAddress();
 
@@ -85,9 +89,7 @@ const CONFIG = {
     Boolean(settings.logging.console),
 };
 
-
 const sessions = new Map();
-
 
 function getLogDir() {
   return settings.logging.dir || appDir;
@@ -151,7 +153,8 @@ function getLanAddress() {
   if (windowsAddress) return windowsAddress;
 
   const networks = os.networkInterfaces();
-  const vpnLike = /(vpn|tap|tun|wireguard|tailscale|zerotier|openvpn|wintun|hyper-v|virtual|vmware|vbox)/i;
+  const vpnLike =
+    /(vpn|tap|tun|wireguard|tailscale|zerotier|openvpn|wintun|hyper-v|virtual|vmware|vbox)/i;
   const candidates = [];
 
   for (const [name, entries] of Object.entries(networks)) {
@@ -195,7 +198,7 @@ function getWindowsPhysicalLanAddress() {
     const address = execFileSync(
       "powershell.exe",
       ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
-      { encoding: "utf8", windowsHide: true, timeout: 2000 }
+      { encoding: "utf8", windowsHide: true, timeout: 2000 },
     ).trim();
 
     return address || null;
@@ -203,7 +206,6 @@ function getWindowsPhysicalLanAddress() {
     return null;
   }
 }
-
 
 function httpToWsOrigin(httpOrigin) {
   const url = new URL(httpOrigin);
@@ -214,13 +216,13 @@ function httpToWsOrigin(httpOrigin) {
 function getServerOrigins() {
   const localHttpOrigin = `http://127.0.0.1:${CONFIG.PORT}`;
   const publicHttpOrigin = normalizeOrigin(
-    CONFIG.PUBLIC_HTTP_ORIGIN || `http://${LAN_ADDRESS}:${CONFIG.PORT}`
+    CONFIG.PUBLIC_HTTP_ORIGIN || `http://${LAN_ADDRESS}:${CONFIG.PORT}`,
   );
 
   return {
     localHttpOrigin,
     publicHttpOrigin,
-    publicWsOrigin: httpToWsOrigin(publicHttpOrigin)
+    publicWsOrigin: httpToWsOrigin(publicHttpOrigin),
   };
 }
 
@@ -232,7 +234,9 @@ function applyCors(res) {
 
 function sendJson(res, statusCode, payload) {
   applyCors(res);
-  res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
+  res.writeHead(statusCode, {
+    "Content-Type": "application/json; charset=utf-8",
+  });
   res.end(JSON.stringify(payload, null, 2));
 }
 
@@ -287,11 +291,13 @@ function createSession(meta = {}) {
     meta,
     extension: null,
     phone: null,
-    lastState: null
+    lastState: null,
   };
 
   sessions.set(session.sessionId, session);
-  log(`New session created: ${session.sessionId}, pairCode: ${session.pairCode}`);
+  log(
+    `New session created: ${session.sessionId}, pairCode: ${session.pairCode}`,
+  );
   trace("server", "session.created", {
     sessionId: session.sessionId,
     pairCode: session.pairCode,
@@ -316,8 +322,8 @@ function publicSession(session) {
     expiresAt: new Date(session.expiresAt).toISOString(),
     connected: {
       extension: Boolean(session.extension),
-      phone: Boolean(session.phone)
-    }
+      phone: Boolean(session.phone),
+    },
   };
 }
 
@@ -367,7 +373,6 @@ function clearSocket(ws) {
       role,
       sessionId,
     });
-
   }
 
   const peerRole = role === "extension" ? "phone" : "extension";
@@ -376,7 +381,7 @@ function clearSocket(ws) {
     type: "peer/disconnected",
     sessionId,
     role,
-    at: new Date().toISOString()
+    at: new Date().toISOString(),
   });
 
   if (!session.extension && !session.phone && isExpired(session)) {
@@ -391,7 +396,9 @@ function socketSession(ws) {
 }
 
 function handleHello(ws, message) {
-  log(`handleHello from ${message.role}: sessionId=${message.sessionId || 'new session'}`);
+  log(
+    `handleHello from ${message.role}: sessionId=${message.sessionId || "new session"}`,
+  );
 
   if (message.role !== "extension" && message.role !== "phone") {
     sendError(ws, "INVALID_ROLE", "role must be extension or phone");
@@ -404,7 +411,11 @@ function handleHello(ws, message) {
     session = sessions.get(message.sessionId);
 
     if (!session || isExpired(session)) {
-      sendError(ws, "SESSION_NOT_FOUND", "Pairing session not found or expired");
+      sendError(
+        ws,
+        "SESSION_NOT_FOUND",
+        "Pairing session not found or expired",
+      );
       ws.close(4404, "Session not found");
       return;
     }
@@ -421,7 +432,7 @@ function handleHello(ws, message) {
       type: "hello/ack",
       role: "extension",
       session: publicSession(session),
-      lastState: session.lastState
+      lastState: session.lastState,
     });
 
     safeSend(ws, {
@@ -433,7 +444,7 @@ function handleHello(ws, message) {
       safeSend(ws, {
         type: "auth/paired",
         sessionId: session.sessionId,
-        pairCode: session.pairCode
+        pairCode: session.pairCode,
       });
     }
 
@@ -462,38 +473,39 @@ function handleHello(ws, message) {
     type: "hello/ack",
     role: "phone",
     session: publicSession(session),
-    lastState: session.lastState
+    lastState: session.lastState,
   });
 
   safeSend(ws, {
     type: "diagnostics/config",
     enabled: Boolean(settings.logging.enabled),
   });
-  
 
   safeSend(ws, {
     type: "auth/paired",
     sessionId: session.sessionId,
-    pairCode: session.pairCode
+    pairCode: session.pairCode,
   });
 
   safeSend(session.extension, {
     type: "auth/paired",
     sessionId: session.sessionId,
-    pairCode: session.pairCode
+    pairCode: session.pairCode,
   });
 
   if (session.lastState) {
     safeSend(ws, {
       type: "state/update",
       sessionId: session.sessionId,
-      state: session.lastState
+      state: session.lastState,
     });
   }
 }
 
 function handleCommand(ws, message) {
-  log(`handleCommand from ${ws.role}: action=${message.action}, payload=${JSON.stringify(message.payload)}`);
+  log(
+    `handleCommand from ${ws.role}: action=${message.action}, payload=${JSON.stringify(message.payload)}`,
+  );
   trace("server", "command.received", {
     role: ws.role,
     action: message.action,
@@ -508,7 +520,11 @@ function handleCommand(ws, message) {
 
   const session = socketSession(ws);
   if (!session) {
-    sendError(ws, "SESSION_NOT_FOUND", "Session is not attached to this socket");
+    sendError(
+      ws,
+      "SESSION_NOT_FOUND",
+      "Session is not attached to this socket",
+    );
     return;
   }
 
@@ -525,12 +541,14 @@ function handleCommand(ws, message) {
     requestId: message.requestId || crypto.randomUUID(),
     action: message.action,
     payload: message.payload || {},
-    sentAt: new Date().toISOString()
+    sentAt: new Date().toISOString(),
   });
 }
 
 function handleStateUpdate(ws, message) {
-  log(`handleStateUpdate from ${ws.role}: event=${message.state?.event || "unknown"}`); 
+  log(
+    `handleStateUpdate from ${ws.role}: event=${message.state?.event || "unknown"}`,
+  );
   if (ws.role !== "extension") {
     sendError(ws, "FORBIDDEN", "Only extension clients can push state");
     return;
@@ -538,7 +556,11 @@ function handleStateUpdate(ws, message) {
 
   const session = socketSession(ws);
   if (!session) {
-    sendError(ws, "SESSION_NOT_FOUND", "Session is not attached to this socket");
+    sendError(
+      ws,
+      "SESSION_NOT_FOUND",
+      "Session is not attached to this socket",
+    );
     return;
   }
 
@@ -551,16 +573,15 @@ function handleStateUpdate(ws, message) {
     trackTitle: message.state?.track?.title || null,
   });
 
-
   session.lastState = {
     ...message.state,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   };
 
   safeSend(session.phone, {
     type: "state/update",
     sessionId: session.sessionId,
-    state: session.lastState
+    state: session.lastState,
   });
 }
 
@@ -581,17 +602,26 @@ function handleDiagnosticsEvent(ws, message) {
   });
 }
 
-
 function handleCommandResult(ws, message) {
-  log(`handleCommandResult from ${ws.role}: ok=${message.ok}, requestId=${message.requestId}`);
+  log(
+    `handleCommandResult from ${ws.role}: ok=${message.ok}, requestId=${message.requestId}`,
+  );
   if (ws.role !== "extension") {
-    sendError(ws, "FORBIDDEN", "Only extension clients can push command results");
+    sendError(
+      ws,
+      "FORBIDDEN",
+      "Only extension clients can push command results",
+    );
     return;
   }
 
   const session = socketSession(ws);
   if (!session) {
-    sendError(ws, "SESSION_NOT_FOUND", "Session is not attached to this socket");
+    sendError(
+      ws,
+      "SESSION_NOT_FOUND",
+      "Session is not attached to this socket",
+    );
     return;
   }
 
@@ -605,7 +635,6 @@ function handleCommandResult(ws, message) {
     trackTitle: message.state?.track?.title || null,
   });
 
-
   safeSend(session.phone, {
     type: "command/result",
     sessionId: session.sessionId,
@@ -613,12 +642,12 @@ function handleCommandResult(ws, message) {
     ok: Boolean(message.ok),
     result: message.result ?? null,
     error: message.error || null,
-    state: message.state || null
+    state: message.state || null,
   });
 }
 
 function handleWsMessage(ws, message) {
-  //log(`Unknown message type from ${ws.role}: ${message.type}`);  
+  //log(`Unknown message type from ${ws.role}: ${message.type}`);
   switch (message.type) {
     case "hello":
       handleHello(ws, message);
@@ -657,7 +686,7 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
   const bootstrapJson = JSON.stringify({
     wsOrigin: publicWsOrigin,
     pairCode,
-    sessionId
+    sessionId,
   });
 
   return `<!doctype html>
@@ -1411,8 +1440,8 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
 
 const server = http.createServer(async (req, res) => {
   if (!req.url.startsWith("/api/health")) {
-  log(`HTTP request: ${req.method} ${req.url}`);
-}
+    log(`HTTP request: ${req.method} ${req.url}`);
+  }
 
   applyCors(res);
 
@@ -1426,63 +1455,62 @@ const server = http.createServer(async (req, res) => {
   const origins = getServerOrigins();
 
   try {
-        if (requestUrl.pathname === "/api/settings" && req.method === "GET") {
-          sendJson(res, 200, {
-            ok: true,
-            settings: {
-              logging: settings.logging,
-            },
-          });
-          return;
-        }
+    if (requestUrl.pathname === "/api/settings" && req.method === "GET") {
+      sendJson(res, 200, {
+        ok: true,
+        settings: {
+          logging: settings.logging,
+        },
+      });
+      return;
+    }
 
-        if (requestUrl.pathname === "/api/settings" && req.method === "PATCH") {
-          const body = safeParseJson(await readBody(req)) || {};
-          const nextLogging = {
-            ...settings.logging,
-            ...(body.logging || {}),
-          };
+    if (requestUrl.pathname === "/api/settings" && req.method === "PATCH") {
+      const body = safeParseJson(await readBody(req)) || {};
+      const nextLogging = {
+        ...settings.logging,
+        ...(body.logging || {}),
+      };
 
-          settings = {
-            ...settings,
-            logging: nextLogging,
-          };
+      settings = {
+        ...settings,
+        logging: nextLogging,
+      };
 
-          CONFIG.DEBUG = Boolean(settings.logging.enabled);
-          CONFIG.DEBUG_CONSOLE = Boolean(settings.logging.console);
+      CONFIG.DEBUG = Boolean(settings.logging.enabled);
+      CONFIG.DEBUG_CONSOLE = Boolean(settings.logging.console);
 
-          saveSettings();
-                for (const session of sessions.values()) {
-                  safeSend(session.extension, {
-                    type: "diagnostics/config",
-                    enabled: Boolean(settings.logging.enabled),
-                  });
+      saveSettings();
+      for (const session of sessions.values()) {
+        safeSend(session.extension, {
+          type: "diagnostics/config",
+          enabled: Boolean(settings.logging.enabled),
+        });
 
-                  safeSend(session.phone, {
-                    type: "diagnostics/config",
-                    enabled: Boolean(settings.logging.enabled),
-                  });
-                }
+        safeSend(session.phone, {
+          type: "diagnostics/config",
+          enabled: Boolean(settings.logging.enabled),
+        });
+      }
 
+      trace("server", "settings.updated", {
+        logging: settings.logging,
+      });
 
-          trace("server", "settings.updated", {
-            logging: settings.logging,
-          });
-
-          sendJson(res, 200, {
-            ok: true,
-            settings: {
-              logging: settings.logging,
-            },
-          });
-          return;
-        }
+      sendJson(res, 200, {
+        ok: true,
+        settings: {
+          logging: settings.logging,
+        },
+      });
+      return;
+    }
 
     if (requestUrl.pathname === "/api/health" && req.method === "GET") {
       sendJson(res, 200, {
         ok: true,
         now: new Date().toISOString(),
-        ...origins
+        ...origins,
       });
       return;
     }
@@ -1500,7 +1528,7 @@ const server = http.createServer(async (req, res) => {
       const remoteUrl = buildRemoteUrl({
         publicHttpOrigin: origins.publicHttpOrigin,
         pairCode: session.pairCode,
-        sessionId: session.sessionId
+        sessionId: session.sessionId,
       });
 
       const qrDataUrl = await createQrDataUrl(remoteUrl);
@@ -1514,7 +1542,7 @@ const server = http.createServer(async (req, res) => {
         publicHttpOrigin: origins.publicHttpOrigin,
         publicWsOrigin: origins.publicWsOrigin,
         remoteUrl,
-        qrDataUrl
+        qrDataUrl,
       });
       return;
     }
@@ -1529,8 +1557,8 @@ const server = http.createServer(async (req, res) => {
         renderRemoteHtml({
           publicWsOrigin: origins.publicWsOrigin,
           pairCode,
-          sessionId
-        })
+          sessionId,
+        }),
       );
       return;
     }
@@ -1558,7 +1586,7 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 wss.on("connection", (ws) => {
-  log("New WebSocket connection established");  
+  log("New WebSocket connection established");
   ws.isAlive = true;
 
   ws.on("pong", () => {
@@ -1566,7 +1594,7 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("message", (buffer) => {
-    //log(`Raw message: ${buffer}`);  
+    //log(`Raw message: ${buffer}`);
     const message = safeParseJson(String(buffer));
     if (!message || typeof message !== "object") {
       sendError(ws, "BAD_JSON", "Message must be valid JSON");
@@ -1576,12 +1604,14 @@ wss.on("connection", (ws) => {
     handleWsMessage(ws, message);
   });
 
-  ws.on("close", (code, reason) => {  // <-- изменено
+  ws.on("close", (code, reason) => {
+    // <-- изменено
     log(`Client closed connection: code=${code}, reason=${reason}`);
     clearSocket(ws);
   });
-  
-  ws.on("error", (err) => {  // <-- изменено
+
+  ws.on("error", (err) => {
+    // <-- изменено
     log(`WebSocket error: ${err.message || err}`);
     clearSocket(ws);
   });
@@ -1604,7 +1634,7 @@ setInterval(() => {
 
     safeSend(ws, {
       type: "server/ping",
-      at: new Date().toISOString()
+      at: new Date().toISOString(),
     });
   }
 }, CONFIG.HEARTBEAT_MS);
@@ -1633,7 +1663,9 @@ if (process.env.ENABLE_CLI === "1") {
         console.log("  stop          - остановка сервера");
         console.log("  debug on      - включить логирование");
         console.log("  debug off     - выключить логирование");
-        console.log("  heartbeat     - показать количество подключенных клиентов");
+        console.log(
+          "  heartbeat     - показать количество подключенных клиентов",
+        );
         console.log("  ip <IP>       - сменить HOST (требует перезапуска)");
         console.log("  port <PORT>   - сменить PORT (требует перезапуска)");
         break;
@@ -1664,7 +1696,9 @@ if (process.env.ENABLE_CLI === "1") {
           console.log(`Для смены IP на ${newIp} требуется перезапуск сервера.`);
         } else if (cmd.startsWith("port ")) {
           const newPort = cmd.split(" ")[1];
-          console.log(`Для смены порта на ${newPort} требуется перезапуск сервера.`);
+          console.log(
+            `Для смены порта на ${newPort} требуется перезапуск сервера.`,
+          );
         } else {
           console.log("Неизвестная команда. help для списка команд.");
         }
@@ -1672,4 +1706,3 @@ if (process.env.ENABLE_CLI === "1") {
     }
   });
 }
-
