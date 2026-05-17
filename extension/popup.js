@@ -136,7 +136,9 @@ async function loadLoggingSettings(serverOrigin) {
     if (!response.ok || !data.ok) {
       throw new Error(data.error || `HTTP ${response.status}`);
     }
-
+    ui.loggingEnabled.checked = Boolean(data.settings?.logging?.enabled);
+    ui.logDir.value = data.settings?.logging?.dir || "";
+    loggingSettingsLoaded = true;
     ui.loggingStatus.textContent = "Настройки логирования загружены";
   } catch (error) {
     ui.loggingStatus.textContent = `Не удалось загрузить настройки: ${error.message}`;
