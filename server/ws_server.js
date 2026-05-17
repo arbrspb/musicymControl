@@ -720,7 +720,20 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
     details.card[open] > summary::after { content: "⌃"; }
     .queue-list { display: grid; gap: 8px; margin-top: 12px; }
     .vibe-list { display: grid; gap: 8px; margin-top: 12px; }
-    .track-wave-button { width: 100%; margin-top: 12px; min-height: 52px; flex: 0 0 auto; }    
+    .track-wave-button { width: 100%; margin-top: 12px; min-height: 52px; flex: 0 0 auto; }
+    .wave-reset-button {
+      width: 100%;
+      margin-top: 8px;
+      min-height: 52px;
+      flex: 0 0 auto;
+      background: #111827;
+      border: 1px solid #374151;
+      color: #facc15;
+    }
+
+    .wave-reset-button:active {
+      background: #1f2937;
+    }
     .vibe-preset { width: 100%; min-height: 52px; flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #111827; color: #f9fafb; text-align: left; }
     .vibe-preset:active { background: #2563eb; }
     .vibe-preset.is-active { outline: 2px solid #facc15; color: #facc15; }
@@ -795,6 +808,7 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
     <details class="card vibe-card">
       <summary>Моя волна <span class="status" id="vibeCurrent"></span></summary>
       <button class="secondary track-wave-button" id="trackWave" type="button" disabled>Моя волна по треку</button>
+      <button class="wave-reset-button" id="resetWave" type="button" disabled>Сбросить волну</button>
       <div class="vibe-list" id="vibeList"></div>
     </details>
 
@@ -826,6 +840,7 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
       const vibeListEl = document.getElementById("vibeList");
       const vibeCurrentEl = document.getElementById("vibeCurrent");
       const trackWaveEl = document.getElementById("trackWave");
+      const resetWaveEl = document.getElementById("resetWave");
 
 
       let socket = null;
@@ -1163,6 +1178,18 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
         trackWaveEl.title = enabled ? "" : "Сначала должен быть выбран трек";
       }
 
+      function applyResetWaveState(state) {
+        const currentWaveId = state?.vibe?.currentId || null;
+        const enabled = Boolean(
+          state?.vibe?.isVibe &&
+          currentWaveId &&
+          currentWaveId !== "user:onyourwave"
+        );
+
+        resetWaveEl.disabled = !enabled;
+        resetWaveEl.title = enabled ? "" : "Сейчас уже обычная Моя волна";
+      }
+
       function commitPosition() {
         const duration = Number(positionEl.max) || 0;
         if (duration <= 0) return;
@@ -1231,6 +1258,7 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
         applyPlaybackState(state);
         applyNavigationState(state);
         applyTrackWaveState(state);
+        applyResetWaveState(state);
 
         applyReactions(track);
         applyProgress(state?.progress);
@@ -1382,6 +1410,9 @@ function renderRemoteHtml({ publicWsOrigin, pairCode = "", sessionId = "" }) {
       });
       trackWaveEl.addEventListener("click", () => {
         sendCommand("startTrackWave");
+      });
+      resetWaveEl.addEventListener("click", () => {
+        sendCommand("resetMyWave");
       });
 
       document.getElementById("refresh").addEventListener("click", () => refreshFromPhone());

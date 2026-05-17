@@ -111,7 +111,9 @@ function generateApi () {
     externalAPI.setVolume = Toggles.setVolume;
     externalAPI.populate = Tracks.populate;
     externalAPI.selectVibePreset = Vibe.selectPreset.bind(Vibe);
-    externalAPI.startTrackWave = Vibe.startFromCurrentTrack.bind(Vibe);    
+    externalAPI.startTrackWave = Vibe.startFromCurrentTrack.bind(Vibe);
+    externalAPI.resetMyWave = Vibe.resetToDefaultWave.bind(Vibe);
+    
 
 
     externalAPI.toggleDislike = Toggles.toggleTrackDisike;

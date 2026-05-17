@@ -521,6 +521,31 @@ const Vibe = {
       loadContextMeta: undefined,
     });
   },
+
+  async resetToDefaultWave() {
+    const current = State.currentContext?.contextData;
+    const seed = "user:onyourwave";
+
+    const context = await Controller.contextController.factory.createContext({
+      data: {
+        type: "vibe",
+        meta: { id: seed },
+        seeds: [seed],
+        from: "web-wave_landing_screen-radio-wheel-default",
+        includeTracksInResponse: true,
+        includeWaveModel: true,
+        interactive: true,
+        parentContextId: current?.parentContextId,
+      },
+    });
+
+    return Controller.playContext({
+      context,
+      queueParams: { index: 0 },
+      entitiesData: undefined,
+      loadContextMeta: undefined,
+    });
+  },
 };
 
 

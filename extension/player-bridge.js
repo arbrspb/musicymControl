@@ -320,7 +320,10 @@
         return api.selectVibePreset(String(payload.id || ""));
 
       case "startTrackWave":
-        return api.startTrackWave();
+        return runNavigation(api, "startTrackWave", () => api.startTrackWave());
+
+      case "resetMyWave":
+        return runNavigation(api, "resetMyWave", () => api.resetMyWave());
 
       case "toggleShuffle":
         return api.toggleShuffle(payload.state);
